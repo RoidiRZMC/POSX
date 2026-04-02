@@ -55,7 +55,6 @@ function initApp() {
     document.getElementById('loginForm').addEventListener('submit', handleLogin);
     document.getElementById('productForm').addEventListener('submit', handleProductSave);
     document.getElementById('vendorForm').addEventListener('submit', handleVendorSave);
-    document.getElementById('customerForm').addEventListener('submit', handleCustomerSave);
     document.getElementById('searchProduct').addEventListener('input', handleSearch);
 }
 
@@ -109,7 +108,6 @@ function showMainApp() {
 
     showSection('pos');
     renderProducts();
-    renderCustomerSelect();
 }
 
 function handleSetup(e) {
@@ -180,7 +178,7 @@ function toggleSidebar() {
 
 function showSection(section) {
     // Hide all sections
-    const sections = ['pos', 'dashboard', 'products', 'vendors', 'customers', 'reports', 'cashClose', 'stockView'];
+    const sections = ['pos', 'dashboard', 'vendors', 'reports', 'cashClose', 'stockView'];
     sections.forEach(s => {
         document.getElementById(s + 'Section').classList.add('hidden');
     });
@@ -200,12 +198,10 @@ function showSection(section) {
     const titles = {
         pos: 'Punto de Venta',
         dashboard: 'Dashboard',
-        products: 'Productos',
         vendors: 'Vendedores',
-        customers: 'Clientes',
         reports: 'Reportes',
         cashClose: 'Cierre de Caja',
-        stockView: 'Inventario'
+        stockView: 'Productos / Stock'
     };
     document.getElementById('sectionTitle').textContent = titles[section];
 
@@ -216,11 +212,15 @@ function showSection(section) {
 
     // Update section specific content
     if (section === 'dashboard') updateDashboard();
-    if (section === 'products') renderProductsTable();
     if (section === 'vendors') renderVendorsTable();
-    if (section === 'customers') renderCustomersTable();
     if (section === 'cashClose') updateCashClose();
-    if (section === 'stockView') renderStockViewTable('all');
+    if (section === 'stockView') {
+        // Show/hide admin controls
+        const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+        document.getElementById('addProductBtn').classList.toggle('hidden', !isAdmin);
+        document.getElementById('actionsHeader').classList.toggle('hidden', !isAdmin);
+        renderStockViewTable('all');
+    }
 }
 
 // ==========================================
@@ -229,19 +229,19 @@ function showSection(section) {
 
 function addSampleProducts() {
     const samples = [
-        { name: 'Cafe Americano', category: 'bebidas', price: 2.50, stock: 100 },
-        { name: 'Cafe Latte', category: 'bebidas', price: 3.50, stock: 100 },
-        { name: 'Refresco', category: 'bebidas', price: 1.50, stock: 50 },
-        { name: 'Agua', category: 'bebidas', price: 1.00, stock: 100 },
-        { name: 'Empanada', category: 'comidas', price: 2.00, stock: 30 },
-        { name: 'Sandwich', category: 'comidas', price: 4.50, stock: 20 },
-        { name: 'Arepa', category: 'comidas', price: 3.00, stock: 25 },
-        { name: 'Hamburguesa', category: 'comidas', price: 6.00, stock: 15 },
-        { name: 'Chocolate', category: 'dulces', price: 1.50, stock: 40 },
-        { name: 'Galletas', category: 'dulces', price: 1.00, stock: 50 },
-        { name: 'Caramelos', category: 'dulces', price: 0.50, stock: 100 },
-        { name: 'Chicle', category: 'otros', price: 0.25, stock: 200 },
-        { name: 'Cigarrillos', category: 'otros', price: 5.00, stock: 30 }
+        { name: 'Cafe Americano', category: 'bebidas', price: 3, stock: 100 },
+        { name: 'Cafe Latte', category: 'bebidas', price: 4, stock: 100 },
+        { name: 'Refresco', category: 'bebidas', price: 2, stock: 50 },
+        { name: 'Agua', category: 'bebidas', price: 1, stock: 100 },
+        { name: 'Empanada', category: 'comidas', price: 2, stock: 30 },
+        { name: 'Sandwich', category: 'comidas', price: 5, stock: 20 },
+        { name: 'Arepa', category: 'comidas', price: 3, stock: 25 },
+        { name: 'Hamburguesa', category: 'comidas', price: 6, stock: 15 },
+        { name: 'Chocolate', category: 'dulces', price: 2, stock: 40 },
+        { name: 'Galletas', category: 'dulces', price: 1, stock: 50 },
+        { name: 'Caramelos', category: 'dulces', price: 1, stock: 100 },
+        { name: 'Chicle', category: 'otros', price: 1, stock: 200 },
+        { name: 'Cigarrillos', category: 'otros', price: 5, stock: 30 }
     ];
 
     samples.forEach(p => {
@@ -303,7 +303,7 @@ function renderProducts() {
             </div>
             <h4 class="font-semibold text-sm truncate">${product.name}</h4>
             <div class="flex justify-between items-center mt-2">
-                <span class="text-primary font-bold">$${product.price.toFixed(2)}</span>
+                <span class="text-primary font-bold">$${Math.round(product.price)}</span>
                 <span class="text-xs ${product.stock <= 10 ? 'text-danger font-bold' : 'text-slate-400'}">Stock: ${product.stock}</span>
             </div>
             ${inCart ? `<span class="absolute top-2 left-2 bg-primary text-white text-xs px-2 py-1 rounded-full">${cartItem.quantity}</span>` : ''}
@@ -418,7 +418,7 @@ function handleProductSave(e) {
     const productData = {
         name: document.getElementById('productName').value,
         category: document.getElementById('productCategory').value,
-        price: parseFloat(document.getElementById('productPrice').value),
+        price: Math.round(parseFloat(document.getElementById('productPrice').value)),
         stock: parseInt(document.getElementById('productStock').value)
     };
 
@@ -437,7 +437,7 @@ function handleProductSave(e) {
 
     saveState();
     closeProductModal();
-    renderProductsTable();
+    renderStockViewTable(currentStockFilter);
     renderProducts();
 }
 
@@ -449,7 +449,7 @@ function deleteProduct(id) {
     if (confirm('¿Estas seguro de eliminar este producto?')) {
         state.products = state.products.filter(p => p.id !== id);
         saveState();
-        renderProductsTable();
+        renderStockViewTable(currentStockFilter);
         renderProducts();
     }
 }
@@ -571,13 +571,13 @@ function renderCart() {
                             </svg>
                         </button>
                     </div>
-                    <span class="font-bold text-primary">$${subtotal.toFixed(2)}</span>
+                    <span class="font-bold text-primary">$${Math.round(subtotal)}</span>
                 </div>
             </div>
         `;
     }).join('');
 
-    totalEl.textContent = '$' + total.toFixed(2);
+    totalEl.textContent = '$' + Math.round(total);
 }
 
 function clearCart() {
@@ -588,11 +588,7 @@ function clearCart() {
     }
 }
 
-function renderCustomerSelect() {
-    const select = document.getElementById('customerSelect');
-    select.innerHTML = '<option value="">Cliente General</option>' +
-        state.customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-}
+
 
 // ==========================================
 // Sales
@@ -605,15 +601,14 @@ function processSale() {
     }
 
     const total = state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const customerId = document.getElementById('customerSelect').value;
     const saleDate = new Date();
 
     // Create sale record
     const sale = {
         id: generateId(),
         items: [...state.cart],
-        total: total,
-        customerId: customerId || null,
+        total: Math.round(total),
+        customerId: null,
         userId: state.currentUser.id,
         userName: state.currentUser.name,
         date: saleDate.toISOString()
@@ -633,20 +628,11 @@ function processSale() {
         user.salesCount++;
     }
 
-    // Update customer if selected
-    if (customerId) {
-        const customer = state.customers.find(c => c.id === customerId);
-        if (customer) {
-            customer.totalPurchases += total;
-            customer.lastPurchase = saleDate.toISOString();
-        }
-    }
-
     state.sales.push(sale);
     
     // Build receipt
     document.getElementById('receiptBusinessName').textContent = state.businessName;
-    document.getElementById('saleTotal').textContent = '$' + total.toFixed(2);
+    document.getElementById('saleTotal').textContent = '$' + Math.round(total);
     document.getElementById('receiptDate').textContent = saleDate.toLocaleDateString('es-ES', { 
         day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' 
     });
@@ -657,7 +643,7 @@ function processSale() {
     receiptDetails.innerHTML = state.cart.map(item => `
         <div class="flex justify-between">
             <span>${item.quantity}x ${item.name}</span>
-            <span>$${(item.price * item.quantity).toFixed(2)}</span>
+            <span>$${Math.round(item.price * item.quantity)}</span>
         </div>
     `).join('');
     
@@ -826,151 +812,33 @@ function deleteVendor(id) {
 }
 
 // ==========================================
-// Customers
-// ==========================================
-
-function renderCustomersTable() {
-    const tbody = document.getElementById('customersTable');
-    
-    if (state.customers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-slate-400">No hay clientes registrados</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = state.customers.map(customer => `
-        <tr class="hover:bg-slate-50">
-            <td class="px-4 py-3 font-medium">${customer.name}</td>
-            <td class="px-4 py-3">${customer.phone || '-'}</td>
-            <td class="px-4 py-3 font-semibold text-success">$${customer.totalPurchases.toFixed(2)}</td>
-            <td class="px-4 py-3 text-sm text-slate-500">${customer.lastPurchase ? formatDate(customer.lastPurchase) : 'Nunca'}</td>
-            <td class="px-4 py-3">
-                <div class="flex gap-2">
-                    <button onclick="editCustomer('${customer.id}')" class="p-2 hover:bg-slate-100 rounded-lg transition">
-                        <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                        </svg>
-                    </button>
-                    <button onclick="viewCustomerSales('${customer.id}')" class="p-2 hover:bg-slate-100 rounded-lg transition">
-                        <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                        </svg>
-                    </button>
-                    <button onclick="deleteCustomer('${customer.id}')" class="p-2 hover:bg-danger/10 rounded-lg transition">
-                        <svg class="w-4 h-4 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                        </svg>
-                    </button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
-}
-
-function openCustomerModal(id = null) {
-    const modal = document.getElementById('customerModal');
-    const title = document.getElementById('customerModalTitle');
-    
-    if (id) {
-        const customer = state.customers.find(c => c.id === id);
-        if (customer) {
-            title.textContent = 'Editar Cliente';
-            document.getElementById('customerId').value = customer.id;
-            document.getElementById('customerName').value = customer.name;
-            document.getElementById('customerPhone').value = customer.phone || '';
-            document.getElementById('customerEmail').value = customer.email || '';
-        }
-    } else {
-        title.textContent = 'Agregar Cliente';
-        document.getElementById('customerForm').reset();
-        document.getElementById('customerId').value = '';
-    }
-    
-    modal.classList.remove('hidden');
-}
-
-function closeCustomerModal() {
-    document.getElementById('customerModal').classList.add('hidden');
-    document.getElementById('customerForm').reset();
-}
-
-function handleCustomerSave(e) {
-    e.preventDefault();
-    
-    const id = document.getElementById('customerId').value;
-    const customerData = {
-        name: document.getElementById('customerName').value,
-        phone: document.getElementById('customerPhone').value,
-        email: document.getElementById('customerEmail').value
-    };
-
-    if (id) {
-        const index = state.customers.findIndex(c => c.id === id);
-        if (index !== -1) {
-            state.customers[index] = { ...state.customers[index], ...customerData };
-        }
-    } else {
-        state.customers.push({
-            id: generateId(),
-            ...customerData,
-            totalPurchases: 0,
-            lastPurchase: null,
-            createdAt: new Date().toISOString()
-        });
-    }
-
-    saveState();
-    closeCustomerModal();
-    renderCustomersTable();
-    renderCustomerSelect();
-}
-
-function editCustomer(id) {
-    openCustomerModal(id);
-}
-
-function deleteCustomer(id) {
-    if (confirm('¿Estas seguro de eliminar este cliente?')) {
-        state.customers = state.customers.filter(c => c.id !== id);
-        saveState();
-        renderCustomersTable();
-        renderCustomerSelect();
-    }
-}
-
-function viewCustomerSales(customerId) {
-    const customer = state.customers.find(c => c.id === customerId);
-    const customerSales = state.sales.filter(s => s.customerId === customerId);
-    
-    let message = `Ventas de ${customer.name}:\n\n`;
-    if (customerSales.length === 0) {
-        message += 'Sin compras registradas';
-    } else {
-        customerSales.forEach(sale => {
-            message += `${formatDate(sale.date)} - $${sale.total.toFixed(2)}\n`;
-        });
-    }
-    alert(message);
-}
-
-// ==========================================
 // Dashboard
 // ==========================================
 
 function updateDashboard() {
-    const today = new Date().toDateString();
-    const todaySales = state.sales.filter(s => new Date(s.date).toDateString() === today);
+    // Get sales since last cash closure (current shift)
+    const lastClosure = state.cashClosures.length > 0 ? 
+        new Date(state.cashClosures[state.cashClosures.length - 1].closeTime) : null;
     
-    const todayTotal = todaySales.reduce((sum, s) => sum + s.total, 0);
+    const currentShiftSales = state.sales.filter(s => {
+        const saleDate = new Date(s.date);
+        if (lastClosure) {
+            return saleDate > lastClosure;
+        }
+        return true; // If no closure yet, include all sales
+    });
+    
+    const shiftTotal = currentShiftSales.reduce((sum, s) => sum + s.total, 0);
     const lowStockCount = state.products.filter(p => p.stock <= 10).length;
 
-    document.getElementById('todaySales').textContent = '$' + todayTotal.toFixed(2);
-    document.getElementById('todayCount').textContent = todaySales.length;
+    document.getElementById('todaySales').textContent = '$' + Math.round(shiftTotal);
+    document.getElementById('todayCount').textContent = currentShiftSales.length;
     document.getElementById('totalProducts').textContent = state.products.length;
     document.getElementById('lowStock').textContent = lowStockCount;
 
-    // Recent sales
+    // Recent sales (from current shift only)
     const recentContainer = document.getElementById('recentSales');
-    const recentSales = [...state.sales].reverse().slice(0, 5);
+    const recentSales = [...currentShiftSales].reverse().slice(0, 5);
     
     if (recentSales.length === 0) {
         recentContainer.innerHTML = '<p class="text-slate-400 text-center py-4">Sin ventas recientes</p>';
@@ -981,16 +849,16 @@ function updateDashboard() {
                     <p class="font-medium text-sm">${sale.items.length} producto(s)</p>
                     <p class="text-xs text-slate-500">${formatDate(sale.date)} - ${sale.userName}</p>
                 </div>
-                <span class="font-bold text-success">$${sale.total.toFixed(2)}</span>
+                <span class="font-bold text-success">$${Math.round(sale.total)}</span>
             </div>
         `).join('');
     }
 
-    // Top products
+    // Top products (from current shift only)
     const topContainer = document.getElementById('topProducts');
     const productSales = {};
     
-    state.sales.forEach(sale => {
+    currentShiftSales.forEach(sale => {
         sale.items.forEach(item => {
             if (!productSales[item.name]) {
                 productSales[item.name] = 0;
@@ -1045,11 +913,19 @@ function showReport(type) {
         });
 
         html = `
-            <h3 class="font-bold text-xl mb-4">Reporte Diario - ${formatDate(today.toISOString())}</h3>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-xl">Reporte Diario - ${formatDate(today.toISOString())}</h3>
+                <button onclick="window.print()" class="bg-slate-200 hover:bg-slate-300 text-dark px-4 py-2 rounded-xl transition flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                    </svg>
+                    Imprimir
+                </button>
+            </div>
             <div class="grid grid-cols-2 gap-4 mb-6">
                 <div class="bg-slate-50 rounded-xl p-4">
                     <p class="text-slate-500 text-sm">Total Vendido</p>
-                    <p class="text-2xl font-bold text-success">$${total.toFixed(2)}</p>
+                    <p class="text-2xl font-bold text-success">$${Math.round(total)}</p>
                 </div>
                 <div class="bg-slate-50 rounded-xl p-4">
                     <p class="text-slate-500 text-sm">Cantidad de Ventas</p>
@@ -1071,7 +947,7 @@ function showReport(type) {
                             <tr class="border-t border-slate-200">
                                 <td class="px-4 py-2">${name}</td>
                                 <td class="px-4 py-2">${data.qty}</td>
-                                <td class="px-4 py-2 font-semibold">$${data.total.toFixed(2)}</td>
+                                <td class="px-4 py-2 font-semibold">$${Math.round(data.total)}</td>
                             </tr>
                         `).join('') || '<tr><td colspan="3" class="text-center py-4 text-slate-400">Sin ventas hoy</td></tr>'}
                     </tbody>
@@ -1098,11 +974,19 @@ function showReport(type) {
         const topProduct = Object.entries(productsSold).sort((a, b) => b[1] - a[1])[0];
 
         html = `
-            <h3 class="font-bold text-xl mb-4">Reporte Mensual - ${today.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h3>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-xl">Reporte Mensual - ${today.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h3>
+                <button onclick="window.print()" class="bg-slate-200 hover:bg-slate-300 text-dark px-4 py-2 rounded-xl transition flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                    </svg>
+                    Imprimir
+                </button>
+            </div>
             <div class="grid grid-cols-3 gap-4 mb-6">
                 <div class="bg-slate-50 rounded-xl p-4">
                     <p class="text-slate-500 text-sm">Total del Mes</p>
-                    <p class="text-2xl font-bold text-success">$${total.toFixed(2)}</p>
+                    <p class="text-2xl font-bold text-success">$${Math.round(total)}</p>
                 </div>
                 <div class="bg-slate-50 rounded-xl p-4">
                     <p class="text-slate-500 text-sm">Ventas Realizadas</p>
@@ -1118,7 +1002,15 @@ function showReport(type) {
         const lowStockProducts = state.products.filter(p => p.stock <= 10).sort((a, b) => a.stock - b.stock);
         
         html = `
-            <h3 class="font-bold text-xl mb-4">Reporte de Stock Bajo - Productos a Reponer</h3>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-xl">Reporte de Stock Bajo - Productos a Reponer</h3>
+                <button onclick="window.print()" class="bg-slate-200 hover:bg-slate-300 text-dark px-4 py-2 rounded-xl transition flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                    </svg>
+                    Imprimir
+                </button>
+            </div>
             <div class="bg-danger/10 border border-danger/20 rounded-xl p-4 mb-6">
                 <p class="text-danger font-semibold">${lowStockProducts.length} producto(s) con stock bajo (10 o menos unidades)</p>
             </div>
@@ -1163,11 +1055,19 @@ function showReport(type) {
         });
 
         html = `
-            <h3 class="font-bold text-xl mb-4">Reporte Anual - ${today.getFullYear()}</h3>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-xl">Reporte Anual - ${today.getFullYear()}</h3>
+                <button onclick="window.print()" class="bg-slate-200 hover:bg-slate-300 text-dark px-4 py-2 rounded-xl transition flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                    </svg>
+                    Imprimir
+                </button>
+            </div>
             <div class="grid grid-cols-2 gap-4 mb-6">
                 <div class="bg-slate-50 rounded-xl p-4">
                     <p class="text-slate-500 text-sm">Total del Ano</p>
-                    <p class="text-2xl font-bold text-success">$${total.toFixed(2)}</p>
+                    <p class="text-2xl font-bold text-success">$${Math.round(total)}</p>
                 </div>
                 <div class="bg-slate-50 rounded-xl p-4">
                     <p class="text-slate-500 text-sm">Ventas Totales</p>
@@ -1179,7 +1079,7 @@ function showReport(type) {
                 ${Object.entries(monthlySales).map(([month, amount]) => `
                     <div class="flex justify-between items-center py-2 border-b last:border-0 border-slate-200">
                         <span class="capitalize">${month}</span>
-                        <span class="font-semibold">$${amount.toFixed(2)}</span>
+                        <span class="font-semibold">$${Math.round(amount)}</span>
                     </div>
                 `).join('') || '<p class="text-center text-slate-400">Sin ventas este ano</p>'}
             </div>
@@ -1199,6 +1099,11 @@ function renderStockViewTable(filter = 'all') {
     currentStockFilter = filter;
     const tbody = document.getElementById('stockViewTable');
     let products = [...state.products];
+    const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+    
+    // Get search term
+    const searchInput = document.getElementById('stockSearchInput');
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
     
     // Update filter buttons
     document.querySelectorAll('.stock-filter-btn').forEach(btn => {
@@ -1214,8 +1119,15 @@ function renderStockViewTable(filter = 'all') {
         products = products.filter(p => p.stock <= 10);
     }
     
+    // Apply search filter
+    if (searchTerm) {
+        products = products.filter(p => p.name.toLowerCase().includes(searchTerm));
+    }
+    
+    const colSpan = isAdmin ? 6 : 5;
+    
     if (products.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-slate-400">No hay productos</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center py-8 text-slate-400">No hay productos</td></tr>`;
         return;
     }
 
@@ -1230,7 +1142,7 @@ function renderStockViewTable(filter = 'all') {
                 </div>
             </td>
             <td class="px-4 py-3 capitalize">${product.category}</td>
-            <td class="px-4 py-3 font-semibold">$${product.price.toFixed(2)}</td>
+            <td class="px-4 py-3 font-semibold">$${Math.round(product.price)}</td>
             <td class="px-4 py-3">
                 <span class="font-bold ${product.stock <= 10 ? 'text-danger' : ''}">${product.stock}</span>
             </td>
@@ -1242,6 +1154,22 @@ function renderStockViewTable(filter = 'all') {
                         : '<span class="px-3 py-1 rounded-full text-xs bg-success/10 text-success">OK</span>'
                 }
             </td>
+            ${isAdmin ? `
+            <td class="px-4 py-3">
+                <div class="flex gap-2">
+                    <button onclick="editProduct('${product.id}')" class="p-2 hover:bg-slate-100 rounded-lg transition">
+                        <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                    </button>
+                    <button onclick="deleteProduct('${product.id}')" class="p-2 hover:bg-danger/10 rounded-lg transition">
+                        <svg class="w-4 h-4 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
+                </div>
+            </td>
+            ` : ''}
         </tr>
     `).join('');
 }
@@ -1255,17 +1183,25 @@ function filterStockView(filter) {
 // ==========================================
 
 function updateCashClose() {
-    const today = new Date().toDateString();
-    const todaySales = state.sales.filter(s => new Date(s.date).toDateString() === today);
-    const total = todaySales.reduce((sum, s) => sum + s.total, 0);
+    // Get sales since last cash closure, not just today's date
+    const lastClosure = state.cashClosures.length > 0 ? 
+        new Date(state.cashClosures[state.cashClosures.length - 1].closeTime) : null;
+    
+    const currentSales = state.sales.filter(s => {
+        const saleDate = new Date(s.date);
+        if (lastClosure) {
+            return saleDate > lastClosure;
+        }
+        return true; // If no closure yet, include all sales
+    });
+    
+    const total = currentSales.reduce((sum, s) => sum + s.total, 0);
 
-    document.getElementById('openTime').textContent = state.cashOpened ? 
-        new Date(state.cashOpened).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '--:--';
-    document.getElementById('closeTotalSales').textContent = todaySales.length;
-    document.getElementById('closeTotalCash').textContent = '$' + total.toFixed(2);
+    document.getElementById('closeTotalSales').textContent = currentSales.length;
+    document.getElementById('closeTotalCash').textContent = '$' + Math.round(total);
 
     const productsSold = {};
-    todaySales.forEach(sale => {
+    currentSales.forEach(sale => {
         sale.items.forEach(item => {
             if (!productsSold[item.name]) {
                 productsSold[item.name] = 0;
@@ -1296,12 +1232,22 @@ function closeCash() {
         return;
     }
 
-    const today = new Date().toDateString();
-    const todaySales = state.sales.filter(s => new Date(s.date).toDateString() === today);
-    const total = todaySales.reduce((sum, s) => sum + s.total, 0);
+    // Get sales since last cash closure
+    const lastClosure = state.cashClosures.length > 0 ? 
+        new Date(state.cashClosures[state.cashClosures.length - 1].closeTime) : null;
+    
+    const currentSales = state.sales.filter(s => {
+        const saleDate = new Date(s.date);
+        if (lastClosure) {
+            return saleDate > lastClosure;
+        }
+        return true;
+    });
+    
+    const total = currentSales.reduce((sum, s) => sum + s.total, 0);
 
     const productsSold = {};
-    todaySales.forEach(sale => {
+    currentSales.forEach(sale => {
         sale.items.forEach(item => {
             if (!productsSold[item.name]) {
                 productsSold[item.name] = 0;
@@ -1314,8 +1260,8 @@ function closeCash() {
         id: generateId(),
         openTime: state.cashOpened,
         closeTime: new Date().toISOString(),
-        totalSales: todaySales.length,
-        totalCash: total,
+        totalSales: currentSales.length,
+        totalCash: Math.round(total),
         productsSold: productsSold,
         closedBy: state.currentUser.id,
         closedByName: state.currentUser.name
@@ -1327,7 +1273,7 @@ function closeCash() {
     saveState();
     updateCashClose();
     
-    alert('Caja cerrada exitosamente');
+    alert('Caja cerrada exitosamente. El dashboard ha sido reiniciado para este turno.');
 }
 
 // ==========================================
